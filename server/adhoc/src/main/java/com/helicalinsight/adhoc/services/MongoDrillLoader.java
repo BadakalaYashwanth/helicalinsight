@@ -224,6 +224,7 @@ class MongoModel {
             if ((username == null) || (password == null) || (authMechanism == null)) {
                 mongo = new MongoClient(host);
                 this.mongoDb = mongo.getDB(database);
+                return this.mongoDb != null;
             } else {
                 List<ServerAddress> seeds = new ArrayList<>();
                 seeds.add(new ServerAddress(host));
