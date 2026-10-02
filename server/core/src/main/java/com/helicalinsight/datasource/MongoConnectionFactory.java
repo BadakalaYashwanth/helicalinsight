@@ -57,14 +57,17 @@ public class MongoConnectionFactory extends DatabaseConnectionFactory {
 			} else {
 				connectionDetails = DataSourceUtils.getConnectionJson(formJson);
 			}
-			if (connectionDetails.has("driverClassName")) {
-				driverClassName = connectionDetails.get("driverClassName").getAsString();
-			}
-			if (connectionDetails.has("Driver")) {
-				driverClassName = connectionDetails.get("Driver").getAsString();
-			}
-			if (connectionDetails.has("driverName")) {
-				driverClassName = connectionDetails.get("driverName").getAsString();
+			// Guard against null connectionDetails to avoid NullPointerException
+			if (connectionDetails != null) {
+				if (connectionDetails.has("driverClassName")) {
+					driverClassName = connectionDetails.get("driverClassName").getAsString();
+				}
+				if (connectionDetails.has("Driver")) {
+					driverClassName = connectionDetails.get("Driver").getAsString();
+				}
+				if (connectionDetails.has("driverName")) {
+					driverClassName = connectionDetails.get("driverName").getAsString();
+				}
 			}
 
 			if ("mongodb.jdbc.MongoDriver".equalsIgnoreCase(driverClassName)) {
@@ -72,7 +75,6 @@ public class MongoConnectionFactory extends DatabaseConnectionFactory {
 				driverConnection.setConnection(null);
 				driverConnection.setDriverClass("mongodb.jdbc.MongoDriver");
 				return driverConnection;
-
 			}
 			if (driverClassName != null && driverClassName.startsWith(JsonUtils.getHiMiddleWareName())) {
 				formJson.addProperty("id", "-1");

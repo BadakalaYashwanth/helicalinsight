@@ -83,25 +83,37 @@ public class MongoDrillLoader extends NoSQLLoader {
     @Override
     public boolean testConnection(JsonObject formData) {
         String host = GsonUtility.optString(formData, "host");
-        String uri = GsonUtility.optString(formData,"jdbcUrl");
-        String database = GsonUtility.optString(formData,"database");
-        String username = GsonUtility.optString(formData,"userName");
-        String password = GsonUtility.optString(formData,"password");
+        String uri = GsonUtility.optString(formData, "jdbcUrl");
+        String database = GsonUtility.optString(formData, "database");
+        String username = GsonUtility.optString(formData, "userName");
+        String password = GsonUtility.optString(formData, "password");
         if (StringUtils.isEmpty(database)) {
-            database = GsonUtility.optString(formData,"databaseName");
+            database = GsonUtility.optString(formData, "databaseName");
         }
+
+        // Validate required MongoDB connection fields before attempting connection
+        if (StringUtils.isEmpty(uri) && StringUtils.isEmpty(host)) {
+            throw new EfwServiceException("MongoDB connection requires a valid host or JDBC URL.");
+        }
+        if (StringUtils.isEmpty(database)) {
+            throw new EfwServiceException("MongoDB connection requires a database name.");
+        }
+
         MongoModel mongoModel = new MongoModel();
-        String splitArray[] = uri.split(":");
+        String[] splitArray = uri.split(":");
         if (splitArray.length >= 3) {
             String hostName = splitArray[1].replace("//", "");
             String port = splitArray[2].substring(0, splitArray[2].indexOf("/"));
             mongoModel.setHost(hostName + ":" + port);
             mongoModel.setUri(uri);
+        } else if (!StringUtils.isEmpty(host)) {
+            // Fall back to explicit host field if jdbcUrl is not in expected format
+            mongoModel.setHost(host);
         }
 
         int timeout = GsonUtility.optInt(formData, "timeOut");
         int maxWait = GsonUtility.optInt(formData, "maxWait");
-        String authMechanism = GsonUtility.optString(formData,"authMechanism");
+        String authMechanism = GsonUtility.optString(formData, "authMechanism");
         mongoModel.setDatabase(database);
         mongoModel.setUsername(username);
         mongoModel.setPassword(password);
@@ -221,7 +233,8 @@ class MongoModel {
         MongoClientOptions.Builder builder = MongoClientOptions.builder();
         MongoClient mongo = null;
         try {
-            if ((username == null) || (password == null) || (authMechanism == null)) {
+            // Use unauthenticated connection when credentials or auth mechanism are absent
+            if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password) || StringUtils.isEmpty(authMechanism)) {
                 mongo = new MongoClient(host);
                 this.mongoDb = mongo.getDB(database);
                 return this.mongoDb != null;
@@ -250,29 +263,26 @@ class MongoModel {
                 }
                 builder.socketKeepAlive(true);
                 MongoClientOptions mongoClientOptions = builder.build();
-                if (uri != null && uri.length() > 0) {
+                if (!StringUtils.isEmpty(uri)) {
                     MongoClientURI mongoURI = new MongoClientURI(uri);
                     mongo = new MongoClient(mongoURI);
                 } else {
                     mongo = new MongoClient(seeds, credentials, mongoClientOptions);
                 }
                 if (database.isEmpty()) {
-                    database = uri.substring(uri.lastIndexOf("/"));
+                    database = uri.substring(uri.lastIndexOf("/") + 1);
                 }
                 this.mongoDb = mongo.getDB(database);
-
                 mongo.getAddress();
                 return this.mongoDb != null;
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("MongoDB connection test failed: " + e.getMessage(), e);
         } finally {
-
             if (mongo != null) {
                 mongo.close();
             }
         }
-        return false;
     }
 
     private boolean notNullOrBlank(String trustStorePassword) {
